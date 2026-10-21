@@ -2,6 +2,7 @@
 /* eslint-env jest */
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 // Mock do AsyncStorage oficial
 jest.mock("@react-native-async-storage/async-storage", () =>
