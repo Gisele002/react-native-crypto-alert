@@ -31,7 +31,21 @@
     },
     "transformIgnorePatterns": [
       "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg)"
-    ]
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.{ts,tsx}",
+      "!src/**/*.styles.ts",
+      "!src/app/**",
+      "!src/constants/**",
+      "!src/theme/**",
+      "!src/**/__tests__/**"
+    ],
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "html"
+    ],
+    "coverageDirectory": "<rootDir>/coverage"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
