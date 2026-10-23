@@ -1,14 +1,15 @@
 import React from "react";
-import { fireEvent, render } from "@testing-library/react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import { router } from "expo-router";
 import { AlertProvider } from "@context/AlertProvider/AlertProvider";
 import { PriceAlertsScreen } from "@screens/PriceAlertsScreen/PriceAlertsScreen";
 import { CreateAlertScreen } from "@screens/CreateAlertScreen/CreateAlertScreen";
-import * as priceAlertsScreenHook from "@screens/PriceAlertsScreen/usePriceAlertsScreen";
 
 describe("Integration - Fluxo Completo de Gestão de Alertas de Preço", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
+    await AsyncStorage.clear();
   });
 
   it("1. deve exibir estado vazio na lista e disparar navegação ao acionar botão de criar", async () => {
@@ -21,7 +22,7 @@ describe("Integration - Fluxo Completo de Gestão de Alertas de Preço", () => {
     expect(await findByText("No alerts yet")).toBeTruthy();
 
     const createBtn = getByRole("button", { name: "New Alert" });
-    fireEvent.press(createBtn);
+    await fireEvent.press(createBtn);
 
     expect(router.push).toHaveBeenCalledWith("/alerts/create");
   });
@@ -42,41 +43,51 @@ describe("Integration - Fluxo Completo de Gestão de Alertas de Preço", () => {
 
     // Testa preenchimento com valor inválido
     const priceInput = getByPlaceholderText("0.00");
-    fireEvent.changeText(priceInput, "-50");
+    await fireEvent.changeText(priceInput, "-50");
     expect(saveBtn.props.accessibilityState).toEqual({ disabled: true });
   });
 
-  it("3. deve carregar e exibir alertas existentes na lista e acionar exclusão", async () => {
-    const mockDelete = jest.fn();
-    jest.spyOn(priceAlertsScreenHook, "usePriceAlertsScreen").mockReturnValue({
-      alerts: [
-        {
-          id: "alert-btc-1",
-          cryptocurrency: "Bitcoin",
-          symbol: "BTC",
-          targetPrice: 75000,
-          condition: "below",
-          createdAt: "2026-03-01T12:00:00.000Z",
-        },
-      ],
-      deleteAlert: mockDelete,
-      goToCreate: jest.fn(),
-    });
+  it("3. deve carregar e exibir alertas existentes na lista e permitir exclusão com persistência", async () => {
+    const existingAlerts = [
+      {
+        id: "alert-btc-1",
+        cryptocurrency: "Bitcoin",
+        symbol: "BTC",
+        targetPrice: 75000,
+        condition: "below" as const,
+        createdAt: "2026-03-01T12:00:00.000Z",
+      },
+    ];
 
-    const { getByText, getByLabelText } = await render(
+    // Prepara o AsyncStorage antes da renderização para simular dados já gravados
+    await AsyncStorage.setItem("cryptoAlerts", JSON.stringify(existingAlerts));
+
+    const { getByText, getByLabelText, queryByText } = await render(
       <AlertProvider>
         <PriceAlertsScreen />
       </AlertProvider>
     );
 
-    expect(getByText("Bitcoin")).toBeTruthy();
-    expect(getByText("below")).toBeTruthy();
-    expect(getByText("$75,000.00")).toBeTruthy();
+    // Aguarda a hidratação assíncrona do AlertProvider e exibição do AlertCard real
+    await waitFor(() => {
+      expect(getByText("Bitcoin")).toBeTruthy();
+      expect(getByText("below")).toBeTruthy();
+      expect(getByText("$75,000.00")).toBeTruthy();
+    });
 
+    // Aciona o botão acessível de exclusão do alerta
     const deleteBtn = getByLabelText("Delete alert");
-    fireEvent.press(deleteBtn);
+    await fireEvent.press(deleteBtn);
 
-    expect(mockDelete).toHaveBeenCalledTimes(1);
-    expect(mockDelete).toHaveBeenCalledWith("alert-btc-1");
+    // Valida que o alerta foi removido da tela e o estado vazio voltou a ser exibido
+    await waitFor(() => {
+      expect(queryByText("Bitcoin")).toBeNull();
+      expect(getByText("No alerts yet")).toBeTruthy();
+    });
+
+    // Valida que a exclusão foi persistida no AsyncStorage
+    await waitFor(() => {
+      expect(AsyncStorage.setItem).toHaveBeenCalledWith("cryptoAlerts", "[]");
+    });
   });
 });
